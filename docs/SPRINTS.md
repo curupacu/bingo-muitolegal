@@ -155,16 +155,44 @@ que as vitórias gravaram certo.
 
 ---
 
-## Sprint 5 — Polimento e deploy
+## Sprint 5 — Polimento e deploy — em andamento
 
 **Objetivo:** pronto pra usar de verdade com uma turma, no celular.
 
-- Responsivo (uso em sala de aula é majoritariamente celular)
-- Feedback visual/sonoro leve ao marcar item e ao anunciar vitória
-- Estados vazios e de erro tratados (sala não existe, sala cheia, etc.)
-- Deploy Supabase em produção + variáveis de ambiente na Vercel
-- Deploy do site na Vercel, domínio configurado
-- Teste real com uma turma/sala e ajustes a partir do feedback
+- [x] Responsivo — achei e corrigi um bug real testando no celular: a
+      cartela 5x5 ficava com o texto praticamente cortado nas bordas das
+      casas (ver `src/components/bingo/cartela.tsx`) — casas não são mais
+      quadradas forçadas no mobile, crescem em altura pra caber o texto
+- [ ] Feedback visual/sonoro leve ao marcar item e ao anunciar vitória —
+      ainda não (o toast de vitória do Sprint 4 já cobre um pouco disso;
+      som fica pra depois se fizer falta)
+- [x] Estados vazios e de erro tratados: sala não encontrada, tema sem
+      itens suficientes, e agora também sala já finalizada (jogador que
+      entra depois do fim vê aviso em vez de simplesmente jogar sem
+      sentido)
+- [ ] Supabase em produção — **já está** (o projeto `bingo-muitolegal`
+      usado desde o Sprint 1 já é o de produção, não tem um ambiente de dev
+      separado nesse MVP)
+- [ ] **Deploy na Vercel — bloqueado em duas ações que só o dono da conta
+      consegue fazer** (autorização de OAuth/GitHub, não dá pra automatizar
+      por fora): ver checklist manual abaixo
+- [ ] Teste real com uma turma — depende do deploy
+
+### Deploy na Vercel — passo a passo manual
+
+Tentei automatizar e esbarrei em duas permissões que só quem é dono da
+conta consegue conceder (não dá pra fazer por API/MCP):
+
+1. **Conectar o repositório**: em [vercel.com/new](https://vercel.com/new),
+   importar `curupacu/bingo-muitolegal`. Isso vai pedir pra autorizar o app
+   da Vercel no GitHub — só você consegue aprovar esse popup.
+2. **Variáveis de ambiente**: na tela de import (ou depois em
+   *Project Settings → Environment Variables*), adicionar:
+   - `NEXT_PUBLIC_SUPABASE_URL` = `https://momhcnvqjxxjgfonmnbu.supabase.co`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `sb_publishable_1zVthG6tTyaoOhWVfB0gpQ_Q13c1eiO`
+   (mesmos valores do `.env.local` local, que não está no git)
+3. Clicar em **Deploy**. Depois disso, todo `git push` pra `main` publica
+   sozinho.
 
 **Critério de pronto:** link público funcionando, testado com gente de
 verdade jogando ao mesmo tempo.

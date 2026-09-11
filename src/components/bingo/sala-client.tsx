@@ -300,6 +300,12 @@ export function SalaClient({ codigo }: { codigo: string }) {
 
       <Separator />
 
+      {sala.status === "finalizada" && (
+        <p className="text-sm text-muted-foreground">
+          Esse jogo já terminou. {!cartela && "Você ainda pode entrar pra ver como ficou, mas não vai rolar mais sorteio."}
+        </p>
+      )}
+
       {!cartela ? (
         <Card className="mx-auto w-full max-w-sm">
           <CardHeader>

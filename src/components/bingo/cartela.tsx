@@ -20,7 +20,7 @@ export function Cartela({
 
   return (
     <div
-      className="grid gap-2"
+      className="grid gap-1.5 sm:gap-2"
       style={{ gridTemplateColumns: `repeat(${tamanho}, minmax(0, 1fr))` }}
     >
       {itens.map((item) => {
@@ -34,7 +34,7 @@ export function Cartela({
             disabled={!jaSorteado}
             onClick={() => aoClicarItem?.(item.id)}
             className={
-              "flex aspect-square items-center justify-center rounded-md border p-2 text-center text-xs transition-colors " +
+              "flex min-h-14 items-center justify-center rounded-md border p-1 text-center text-[11px] leading-tight break-words hyphens-auto transition-colors sm:aspect-square sm:min-h-0 sm:p-2 sm:text-xs " +
               (marcado
                 ? "border-primary bg-primary text-primary-foreground"
                 : jaSorteado
