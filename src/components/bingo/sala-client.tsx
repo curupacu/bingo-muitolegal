@@ -45,6 +45,11 @@ interface ItemSorteado {
   ordem: number;
 }
 
+interface Vitoria {
+  jogadorId: string;
+  tipo: "linha" | "cartela_cheia";
+}
+
 export function SalaClient({ codigo }: { codigo: string }) {
   const sessionId = useSessaoAnonima();
   const [supabase] = useState(() => criarClienteSupabase());
@@ -58,11 +63,18 @@ export function SalaClient({ codigo }: { codigo: string }) {
   const [cartela, setCartela] = useState<ItemCartela[] | null>(null);
   const [marcados, setMarcados] = useState<string[]>([]);
   const [sorteios, setSorteios] = useState<ItemSorteado[]>([]);
+  const [vitorias, setVitorias] = useState<Vitoria[]>([]);
   const [entrando, setEntrando] = useState(false);
   const [sorteando, setSorteando] = useState(false);
 
   const isHost = Boolean(sessionId && sala && sessionId === sala.hostSessionId);
   const sorteadosSet = useMemo(() => new Set(sorteios.map((s) => s.id)), [sorteios]);
+  const apelidoPorJogadorId = useMemo(
+    () => new Map(jogadores.map((j) => [j.id, j.apelido])),
+    [jogadores]
+  );
+  const vencedoresLinha = vitorias.filter((v) => v.tipo === "linha");
+  const vencedoresCartelaCheia = vitorias.filter((v) => v.tipo === "cartela_cheia");
 
   const carregar = useCallback(async () => {
     if (!sessionId) return;
@@ -121,6 +133,18 @@ export function SalaClient({ codigo }: { codigo: string }) {
 
     setJogadores(jogadoresRows ?? []);
 
+    const { data: vitoriasRows } = await supabase
+      .from("vitorias")
+      .select("jogador_id, tipo")
+      .eq("sala_id", salaRow.id);
+
+    setVitorias(
+      (vitoriasRows ?? []).map((v) => ({
+        jogadorId: v.jogador_id,
+        tipo: v.tipo as Vitoria["tipo"],
+      }))
+    );
+
     const { data: jogadorAtual } = await supabase
       .from("jogadores")
       .select("id")
@@ -172,6 +196,21 @@ export function SalaClient({ codigo }: { codigo: string }) {
         const rotulo = itensPorId.get(itemTemaId) ?? "?";
         return [...atual, { id: itemTemaId, ordem, rotulo }].sort((a, b) => a.ordem - b.ordem);
       });
+    },
+    aoVencer: ({ jogadorId, tipo }) => {
+      const tipoNormalizado: Vitoria["tipo"] = tipo === "cartela_cheia" ? "cartela_cheia" : "linha";
+
+      if (vitorias.some((v) => v.jogadorId === jogadorId && v.tipo === tipoNormalizado)) {
+        return;
+      }
+
+      const apelido = apelidoPorJogadorId.get(jogadorId) ?? "Alguém";
+      toast.success(
+        tipoNormalizado === "cartela_cheia"
+          ? `🏆 ${apelido} fez BINGO com a cartela cheia!`
+          : `🎉 ${apelido} fechou uma linha!`
+      );
+      setVitorias((atual) => [...atual, { jogadorId, tipo: tipoNormalizado }]);
     },
   });
 
@@ -297,13 +336,15 @@ export function SalaClient({ codigo }: { codigo: string }) {
                   <Button
                     size="sm"
                     onClick={aoSortear}
-                    disabled={sorteando || todosSorteados}
+                    disabled={sorteando || todosSorteados || sala.status === "finalizada"}
                   >
                     {sorteando
                       ? "Sorteando..."
-                      : todosSorteados
-                        ? "Todos os itens já saíram"
-                        : `Sortear próximo (${sorteios.length}/${totalItens})`}
+                      : sala.status === "finalizada"
+                        ? "Jogo encerrado"
+                        : todosSorteados
+                          ? "Todos os itens já saíram"
+                          : `Sortear próximo (${sorteios.length}/${totalItens})`}
                   </Button>
                 )}
 
@@ -331,6 +372,36 @@ export function SalaClient({ codigo }: { codigo: string }) {
               </CardContent>
             </Card>
 
+            {vitorias.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Vencedores</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3 text-sm">
+                  {vencedoresLinha.length > 0 && (
+                    <div>
+                      <p className="text-muted-foreground">🎉 Linha</p>
+                      <p>
+                        {vencedoresLinha
+                          .map((v) => apelidoPorJogadorId.get(v.jogadorId) ?? "Alguém")
+                          .join(", ")}
+                      </p>
+                    </div>
+                  )}
+                  {vencedoresCartelaCheia.length > 0 && (
+                    <div>
+                      <p className="text-muted-foreground">🏆 Cartela cheia</p>
+                      <p>
+                        {vencedoresCartelaCheia
+                          .map((v) => apelidoPorJogadorId.get(v.jogadorId) ?? "Alguém")
+                          .join(", ")}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -354,8 +425,8 @@ export function SalaClient({ codigo }: { codigo: string }) {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Protótipo — detectar bingo de linha/cartela cheia entra no Sprint 4
-        (veja <code className="rounded bg-muted px-1 py-0.5">docs/SPRINTS.md</code>
+        Protótipo — visual ainda simples, o layout final vem depois (veja{" "}
+        <code className="rounded bg-muted px-1 py-0.5">docs/SPRINTS.md</code>
         ). Clique numa casa da cartela depois que o item for sorteado pra
         marcar.
       </p>

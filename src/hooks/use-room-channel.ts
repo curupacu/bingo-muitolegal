@@ -13,17 +13,23 @@ interface ItemSorteadoPayload {
   ordem: number;
 }
 
+interface VitoriaPayload {
+  jogadorId: string;
+  tipo: string;
+}
+
 interface EventosSala {
   aoEntrarJogador?: (jogador: JogadorEntrouPayload) => void;
   aoAtualizarStatus?: (status: string) => void;
   aoSortear?: (item: ItemSorteadoPayload) => void;
+  aoVencer?: (vitoria: VitoriaPayload) => void;
 }
 
 /**
  * Assina o canal Realtime da sala: novos jogadores entrando (INSERT em
- * `jogadores`), mudanças de status da sala (UPDATE em `salas`) e novos
- * itens sorteados (INSERT em `sorteios`), refletidos pra todo mundo na sala
- * sem precisar dar refresh.
+ * `jogadores`), mudanças de status da sala (UPDATE em `salas`), novos
+ * itens sorteados (INSERT em `sorteios`) e vitórias (INSERT em `vitorias`),
+ * refletidos pra todo mundo na sala sem precisar dar refresh.
  *
  * `eventos` pode ser passado inline a cada render — os callbacks ficam num
  * ref, então o canal só reabre quando `salaId` muda de verdade.
@@ -81,6 +87,19 @@ export function useRoomChannel(
         (payload) => {
           const linha = payload.new as { item_tema_id: string; ordem: number };
           eventosRef.current.aoSortear?.({ itemTemaId: linha.item_tema_id, ordem: linha.ordem });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "vitorias",
+          filter: `sala_id=eq.${salaId}`,
+        },
+        (payload) => {
+          const linha = payload.new as { jogador_id: string; tipo: string };
+          eventosRef.current.aoVencer?.({ jogadorId: linha.jogador_id, tipo: linha.tipo });
         }
       )
       .subscribe();

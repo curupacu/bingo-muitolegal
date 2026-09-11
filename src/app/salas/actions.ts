@@ -3,6 +3,7 @@
 import { criarClienteSupabaseServidor } from "@/lib/supabase/server";
 import { gerarCartela } from "@/lib/game/gerar-cartela";
 import { gerarCodigoSala } from "@/lib/game/gerar-codigo-sala";
+import { verificarVitoria } from "@/lib/game/verificar-vitoria";
 import type { ItemTema } from "@/lib/types";
 
 const TENTATIVAS_CODIGO = 6;
@@ -286,7 +287,7 @@ export async function marcarItemCartela(input: {
 
   const { data: cartela, error: erroCartela } = await supabase
     .from("cartelas")
-    .select("id, sala_id, marcados")
+    .select("id, sala_id, jogador_id, itens, marcados")
     .eq("id", input.cartelaId)
     .single();
 
@@ -321,5 +322,63 @@ export async function marcarItemCartela(input: {
     return { ok: false, erro: "Não deu pra marcar. Tenta de novo." };
   }
 
+  if (input.marcar) {
+    await registrarVitoriaSeAplicavel(supabase, {
+      salaId: cartela.sala_id,
+      jogadorId: cartela.jogador_id,
+      itens: cartela.itens as string[],
+      marcados: marcadosAtuais,
+    });
+  }
+
   return { ok: true };
+}
+
+/**
+ * Depois de marcar um item, confere se essa cartela bateu linha/coluna ou
+ * cartela cheia e, se for a primeira vez pra esse jogador nesse tipo,
+ * grava em `vitorias`. Coluna conta como a mesma categoria de "linha" pras
+ * regras do jogo (só linha e cartela cheia foram definidas com o dono do
+ * produto) — normaliza aqui pra não complicar a UI com um terceiro tipo.
+ */
+async function registrarVitoriaSeAplicavel(
+  supabase: ClienteSupabase,
+  params: { salaId: string; jogadorId: string; itens: string[]; marcados: Set<string> }
+) {
+  const tamanho = Math.round(Math.sqrt(params.itens.length));
+  const resultado = verificarVitoria(params.itens, params.marcados, tamanho);
+
+  if (!resultado.venceu || !resultado.tipo) return;
+
+  const tipo = resultado.tipo === "coluna" ? "linha" : resultado.tipo;
+
+  const { data: existente } = await supabase
+    .from("vitorias")
+    .select("id")
+    .eq("jogador_id", params.jogadorId)
+    .eq("tipo", tipo)
+    .maybeSingle();
+
+  if (existente) return;
+
+  await supabase.from("vitorias").insert({
+    sala_id: params.salaId,
+    jogador_id: params.jogadorId,
+    tipo,
+  });
+
+  if (tipo === "cartela_cheia") {
+    await supabase.from("salas").update({ status: "finalizada" }).eq("id", params.salaId);
+    return;
+  }
+
+  const { data: salaAtual } = await supabase
+    .from("salas")
+    .select("status")
+    .eq("id", params.salaId)
+    .single();
+
+  if (salaAtual?.status === "sorteando") {
+    await supabase.from("salas").update({ status: "linha_fechada" }).eq("id", params.salaId);
+  }
 }

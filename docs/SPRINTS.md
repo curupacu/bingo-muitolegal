@@ -127,20 +127,31 @@ contexto.
 
 ---
 
-## Sprint 4 — Vitória
+## Sprint 4 — Vitória — concluído
 
 **Objetivo:** o jogo sabe dizer quem ganhou, e quando.
 
-- Checar `verificarVitoria` a cada marcação
-- Suportar múltiplos vencedores de "linha" (jogo não para na primeira
-  linha)
-- Registrar vitórias em `vitorias`, com o tipo (linha/coluna/cartela cheia)
-- Banner/toast anunciando vencedores em tempo real pra sala toda
-- Tela de fim de jogo quando a cartela cheia é batida (ranking de quem
-  ganhou linha e quem ganhou a cartela)
+- [x] `verificarVitoria` checado a cada marcação (server-side, dentro de
+      `marcarItemCartela`)
+- [x] Suporta múltiplos vencedores de "linha" (jogo não para na primeira —
+      cada jogador só registra uma vez por tipo, mas vários podem vencer)
+- [x] Vitórias gravadas em `vitorias`, tipo `linha` ou `cartela_cheia`
+      (coluna normalizada pra "linha" — só essas duas categorias foram
+      definidas nas regras, ver `verificarVitoria`)
+- [x] Toast anunciando o vencedor em tempo real pra sala toda (evento
+      `aoVencer` em `useRoomChannel`)
+- [x] Painel "Vencedores" (inline, sem tela separada) lista quem já fechou
+      linha e quem já fez cartela cheia — some quando não há vencedores
+      ainda
+- [x] Sala vai pra `linha_fechada` no primeiro bingo de linha e
+      `finalizada` na cartela cheia; sorteio trava (host não sorteia mais)
+      quando finalizada
 
-**Critério de pronto:** partida completa jogada até o fim mostra os
-vencedores corretos pra todos os participantes, sem precisar dar refresh.
+**Critério de pronto:** ✅ testado uma partida completa 3x3 do início ao
+fim: bati linha (toast + painel de vencedores atualizou, status virou
+"Linha fechada"), depois cartela cheia (toast + status "Finalizada" +
+botão de sortear virou "Jogo encerrado"). Conferido também direto no banco
+que as vitórias gravaram certo.
 
 ---
 
