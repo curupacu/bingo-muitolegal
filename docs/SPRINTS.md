@@ -184,8 +184,50 @@ que as vitórias gravaram certo.
 **Critério de pronto:** ✅ link público no ar, testado criando sala e
 gerando cartela em produção.
 
-**Critério de pronto:** link público funcionando, testado com gente de
-verdade jogando ao mesmo tempo.
+---
+
+## Sprint 6 — Modo observação e eventos de vários dias — concluído
+
+**Objetivo:** suportar o tema "Banca de TCC" — mecânica diferente (sem
+sorteio) e um evento que atravessa dois dias.
+
+Motivado por feedback real de uso: os temas de sorteio precisam de mais
+itens que o tamanho da cartela pra dar a emoção de um bingo de verdade
+(já funcionava, só faltava deixar claro), e o tema da banca de TCC (com
+uma banca de protótipos segunda e terça) não é um sorteio — são coisas
+que os professores/algo vai fazer, cada jogador marca o que presencia.
+
+- [x] **Modo "observação"**: nova coluna `salas.modo`
+      (`sorteio` | `observacao`). No modo observação não existe sorteio —
+      toda casa da cartela já fica liberada pra marcar assim que o
+      jogador entra; a detecção de linha/cartela cheia é a mesma lógica
+      de sempre, só muda como a casa fica "disponível"
+  - Painel "Sorteio" vira um painel "Como jogar" nesse modo (sem botão de
+    host, sem histórico de sorteio)
+- [x] **Janela de data/hora opcional** (`abre_em` / `fecha_em`): sala
+      pode ter um período definido (ex: segunda 13h30 até terça 19h).
+      Fora da janela, a sala mostra um aviso em vez do jogo ("ainda não
+      abriu" / "já encerrou") — o host também não consegue mais sortear
+      depois do fechamento
+- [x] **Persistência entre dias**: decidido manter sessão anônima por
+      `localStorage` (sem login) — já funciona sozinho pro caso comum
+      (mesmo aparelho nos dois dias). Documentado o limite (trocar de
+      aparelho perde a cartela) em
+      [REGRAS_DO_JOGO.md](./REGRAS_DO_JOGO.md#pontos-em-aberto-decidirtestar-depois)
+- [x] Tela de criar sala ganhou seletor de modo e campos opcionais de
+      data/hora
+
+**Bug achado e corrigido nesse sprint:** no modo observação a sala nunca
+saía do status "aguardando" — a transição pra "linha fechada" só
+verificava o status `sorteando`, que esse modo nunca atinge (não tem
+sorteio pra disparar isso). Também achei que o botão de sortear
+continuava clicável mesmo depois do prazo (`fecha_em`) vencido — os dois
+corrigidos e testados.
+
+**Critério de pronto:** ✅ testado modo observação do início ao fim (linha
+batida sem nenhum sorteio, status certo), e testado a janela de data nos
+dois estados (antes de abrir / depois de fechar) manipulando o horário
+direto no banco.
 
 ---
 

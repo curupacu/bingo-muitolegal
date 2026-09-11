@@ -90,13 +90,23 @@ export async function criarSala(input: {
   tamanho: number;
   apelido: string;
   sessionId: string;
+  modo?: "sorteio" | "observacao";
+  abreEm?: string | null;
+  fechaEm?: string | null;
 }): Promise<ResultadoAcaoSala> {
   const apelido = input.apelido.trim();
+  const modo = input.modo ?? "sorteio";
 
   if (!apelido) return { ok: false, erro: "Escreve um apelido." };
   if (!input.sessionId) return { ok: false, erro: "Sessão inválida — recarregue a página." };
   if (!TAMANHOS_VALIDOS.includes(input.tamanho)) {
     return { ok: false, erro: "Tamanho de cartela inválido." };
+  }
+  if (modo !== "sorteio" && modo !== "observacao") {
+    return { ok: false, erro: "Modo de jogo inválido." };
+  }
+  if (input.abreEm && input.fechaEm && new Date(input.abreEm) >= new Date(input.fechaEm)) {
+    return { ok: false, erro: "A data de fim precisa ser depois da data de início." };
   }
 
   const supabase = await criarClienteSupabaseServidor();
@@ -123,6 +133,9 @@ export async function criarSala(input: {
         tema_id: tema.id,
         tamanho_cartela: input.tamanho,
         host_session_id: input.sessionId,
+        modo,
+        abre_em: input.abreEm ?? null,
+        fecha_em: input.fechaEm ?? null,
       })
       .select("id, codigo")
       .single();
@@ -227,7 +240,7 @@ export async function sortearProximoItem(input: {
 
   const { data: sala, error: erroSala } = await supabase
     .from("salas")
-    .select("id, tema_id, status, host_session_id")
+    .select("id, tema_id, status, host_session_id, fecha_em")
     .eq("codigo", codigo)
     .maybeSingle();
 
@@ -237,6 +250,10 @@ export async function sortearProximoItem(input: {
 
   if (sala.host_session_id !== input.sessionId) {
     return { ok: false, erro: "Só quem criou a sala pode sortear." };
+  }
+
+  if (sala.fecha_em && new Date(sala.fecha_em) < new Date()) {
+    return { ok: false, erro: "Essa sala já encerrou." };
   }
 
   const itens = await buscarItensDoTema(supabase, sala.tema_id);
@@ -277,7 +294,12 @@ export async function sortearProximoItem(input: {
   return { ok: true, item: { id: escolhido.id, rotulo: escolhido.rotulo } };
 }
 
-/** Marca ou desmarca um item na cartela do jogador (só itens já sorteados). */
+/**
+ * Marca ou desmarca um item na cartela do jogador. No modo "sorteio" só
+ * deixa marcar item que já saiu no sorteio; no modo "observação" (ex: banca
+ * de TCC) não tem sorteio nenhum — o jogador marca livremente o que
+ * presenciou.
+ */
 export async function marcarItemCartela(input: {
   cartelaId: string;
   itemId: string;
@@ -295,15 +317,23 @@ export async function marcarItemCartela(input: {
     return { ok: false, erro: "Cartela não encontrada." };
   }
 
-  const { data: sorteado } = await supabase
-    .from("sorteios")
-    .select("id")
-    .eq("sala_id", cartela.sala_id)
-    .eq("item_tema_id", input.itemId)
-    .maybeSingle();
+  const { data: sala } = await supabase
+    .from("salas")
+    .select("modo")
+    .eq("id", cartela.sala_id)
+    .single();
 
-  if (!sorteado) {
-    return { ok: false, erro: "Esse item ainda não foi sorteado." };
+  if (sala?.modo !== "observacao") {
+    const { data: sorteado } = await supabase
+      .from("sorteios")
+      .select("id")
+      .eq("sala_id", cartela.sala_id)
+      .eq("item_tema_id", input.itemId)
+      .maybeSingle();
+
+    if (!sorteado) {
+      return { ok: false, erro: "Esse item ainda não foi sorteado." };
+    }
   }
 
   const marcadosAtuais = new Set<string>(cartela.marcados as string[]);
@@ -378,7 +408,9 @@ async function registrarVitoriaSeAplicavel(
     .eq("id", params.salaId)
     .single();
 
-  if (salaAtual?.status === "sorteando") {
+  // No modo observação a sala nunca passa por "sorteando" (não tem sorteio
+  // pra disparar isso) — trata "aguardando" também como "ainda sem linha".
+  if (salaAtual?.status === "sorteando" || salaAtual?.status === "aguardando") {
     await supabase.from("salas").update({ status: "linha_fechada" }).eq("id", params.salaId);
   }
 }

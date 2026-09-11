@@ -32,6 +32,19 @@ interface EstadoSala {
   tamanho: number;
   status: string;
   hostSessionId: string;
+  modo: "sorteio" | "observacao";
+  abreEm: string | null;
+  fechaEm: string | null;
+}
+
+function formatarData(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 interface Jogador {
@@ -68,7 +81,12 @@ export function SalaClient({ codigo }: { codigo: string }) {
   const [sorteando, setSorteando] = useState(false);
 
   const isHost = Boolean(sessionId && sala && sessionId === sala.hostSessionId);
-  const sorteadosSet = useMemo(() => new Set(sorteios.map((s) => s.id)), [sorteios]);
+  const sorteadosSet = useMemo(() => {
+    if (sala?.modo === "observacao") {
+      return new Set((cartela ?? []).map((item) => item.id));
+    }
+    return new Set(sorteios.map((s) => s.id));
+  }, [sala?.modo, cartela, sorteios]);
   const apelidoPorJogadorId = useMemo(
     () => new Map(jogadores.map((j) => [j.id, j.apelido])),
     [jogadores]
@@ -83,7 +101,9 @@ export function SalaClient({ codigo }: { codigo: string }) {
 
     const { data: salaRow, error: erroSala } = await supabase
       .from("salas")
-      .select("id, tamanho_cartela, status, host_session_id, tema_id, temas(nome)")
+      .select(
+        "id, tamanho_cartela, status, host_session_id, tema_id, modo, abre_em, fecha_em, temas(nome)"
+      )
       .eq("codigo", codigoUpper)
       .maybeSingle();
 
@@ -101,6 +121,9 @@ export function SalaClient({ codigo }: { codigo: string }) {
       tamanho: salaRow.tamanho_cartela,
       status: salaRow.status,
       hostSessionId: salaRow.host_session_id,
+      modo: salaRow.modo === "observacao" ? "observacao" : "sorteio",
+      abreEm: salaRow.abre_em,
+      fechaEm: salaRow.fecha_em,
     });
 
     const { data: itensRows } = await supabase
@@ -283,6 +306,26 @@ export function SalaClient({ codigo }: { codigo: string }) {
   const totalItens = itensPorId.size;
   const todosSorteados = totalItens > 0 && sorteios.length >= totalItens;
   const ultimoSorteio = sorteios[sorteios.length - 1];
+  const agora = new Date();
+  const aindaNaoComecou = Boolean(sala.abreEm && agora < new Date(sala.abreEm));
+  const jaEncerrouPorData = Boolean(sala.fechaEm && agora > new Date(sala.fechaEm));
+
+  if (aindaNaoComecou) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-16 text-center">
+        <p className="text-sm text-muted-foreground">
+          Sala &middot; {sala.temaNome}
+        </p>
+        <h1 className="text-2xl font-bold tracking-tight uppercase">{codigo}</h1>
+        <p className="text-sm text-muted-foreground">
+          Essa sala ainda não abriu. Abre {formatarData(sala.abreEm!)}.
+        </p>
+        <Button render={<Link href="/" />} nativeButton={false} variant="secondary">
+          Voltar pro início
+        </Button>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-10">
@@ -292,6 +335,11 @@ export function SalaClient({ codigo }: { codigo: string }) {
             Sala &middot; {sala.temaNome}
           </p>
           <h1 className="text-2xl font-bold tracking-tight uppercase">{codigo}</h1>
+          {sala.fechaEm && !jaEncerrouPorData && (
+            <p className="text-xs text-muted-foreground">
+              Aberta até {formatarData(sala.fechaEm)}
+            </p>
+          )}
         </div>
         <Badge variant="secondary">
           {STATUS_ROTULO[sala.status] ?? sala.status}
@@ -300,9 +348,12 @@ export function SalaClient({ codigo }: { codigo: string }) {
 
       <Separator />
 
-      {sala.status === "finalizada" && (
+      {(sala.status === "finalizada" || jaEncerrouPorData) && (
         <p className="text-sm text-muted-foreground">
-          Esse jogo já terminou. {!cartela && "Você ainda pode entrar pra ver como ficou, mas não vai rolar mais sorteio."}
+          {jaEncerrouPorData
+            ? `Essa sala encerrou ${formatarData(sala.fechaEm!)}.`
+            : "Esse jogo já terminou."}{" "}
+          {!cartela && "Você ainda pode entrar pra ver como ficou."}
         </p>
       )}
 
@@ -333,50 +384,70 @@ export function SalaClient({ codigo }: { codigo: string }) {
           </Card>
 
           <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Sorteio</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
-                {isHost && (
-                  <Button
-                    size="sm"
-                    onClick={aoSortear}
-                    disabled={sorteando || todosSorteados || sala.status === "finalizada"}
-                  >
-                    {sorteando
-                      ? "Sorteando..."
-                      : sala.status === "finalizada"
-                        ? "Jogo encerrado"
-                        : todosSorteados
-                          ? "Todos os itens já saíram"
-                          : `Sortear próximo (${sorteios.length}/${totalItens})`}
-                  </Button>
-                )}
-
-                {sorteios.length === 0 ? (
+            {sala.modo === "observacao" ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Como jogar</CardTitle>
+                </CardHeader>
+                <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    {isHost
-                      ? "Clique em sortear pra começar."
-                      : "Nenhum item sorteado ainda."}
+                    Sem sorteio aqui — clique na sua cartela assim que
+                    presenciar aquilo acontecendo ao vivo. Quem fechar uma
+                    linha ou a cartela toda primeiro vence.
                   </p>
-                ) : (
-                  <>
-                    <p className="text-sm">
-                      <span className="text-muted-foreground">Último: </span>
-                      <strong>{ultimoSorteio.rotulo}</strong>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Sorteio</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  {isHost && (
+                    <Button
+                      size="sm"
+                      onClick={aoSortear}
+                      disabled={
+                        sorteando ||
+                        todosSorteados ||
+                        sala.status === "finalizada" ||
+                        jaEncerrouPorData
+                      }
+                    >
+                      {sorteando
+                        ? "Sorteando..."
+                        : sala.status === "finalizada" || jaEncerrouPorData
+                          ? "Jogo encerrado"
+                          : todosSorteados
+                            ? "Todos os itens já saíram"
+                            : `Sortear próximo (${sorteios.length}/${totalItens})`}
+                    </Button>
+                  )}
+
+                  {sorteios.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {isHost
+                        ? "Clique em sortear pra começar."
+                        : "Nenhum item sorteado ainda."}
                     </p>
-                    <div className="flex flex-wrap gap-1">
-                      {sorteios.map((s) => (
-                        <Badge key={s.id} variant="outline" className="font-normal">
-                          {s.rotulo}
-                        </Badge>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                  ) : (
+                    <>
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Último: </span>
+                        <strong>{ultimoSorteio.rotulo}</strong>
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {sorteios.map((s) => (
+                          <Badge key={s.id} variant="outline" className="font-normal">
+                            {s.rotulo}
+                          </Badge>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {vitorias.length > 0 && (
               <Card>
@@ -433,8 +504,10 @@ export function SalaClient({ codigo }: { codigo: string }) {
       <p className="text-xs text-muted-foreground">
         Protótipo — visual ainda simples, o layout final vem depois (veja{" "}
         <code className="rounded bg-muted px-1 py-0.5">docs/SPRINTS.md</code>
-        ). Clique numa casa da cartela depois que o item for sorteado pra
-        marcar.
+        ).{" "}
+        {sala.modo === "observacao"
+          ? "Clique na cartela pra marcar o que você for presenciando."
+          : "Clique numa casa da cartela depois que o item for sorteado pra marcar."}
       </p>
     </main>
   );
