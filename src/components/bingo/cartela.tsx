@@ -34,11 +34,11 @@ export function Cartela({
             disabled={!jaSorteado}
             onClick={() => aoClicarItem?.(item.id)}
             className={
-              "flex min-h-14 items-center justify-center rounded-md border p-1 text-center text-[11px] leading-tight break-words hyphens-auto transition-colors sm:aspect-square sm:min-h-0 sm:p-2 sm:text-xs " +
+              "flex min-h-14 items-center justify-center rounded-lg border p-1 text-center text-[11px] leading-tight break-words hyphens-auto transition-colors sm:aspect-square sm:min-h-0 sm:p-2 sm:text-xs " +
               (marcado
-                ? "border-primary bg-primary text-primary-foreground"
+                ? "border-primary bg-primary text-primary-foreground shadow-sm"
                 : jaSorteado
-                  ? "border-emerald-500/50 bg-emerald-500/10 text-foreground hover:bg-emerald-500/20"
+                  ? "border-amber-400/60 bg-amber-400/15 text-foreground hover:bg-amber-400/25"
                   : "bg-muted/40 text-muted-foreground")
             }
           >
