@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useSessaoAnonima } from "@/hooks/use-sessao-anonima";
+import { useRoomChannel } from "@/hooks/use-room-channel";
 import { criarClienteSupabase } from "@/lib/supabase/client";
 import { entrarNaSala } from "@/app/salas/actions";
 import { Cartela } from "@/components/bingo/cartela";
@@ -32,6 +33,11 @@ interface EstadoSala {
   status: string;
 }
 
+interface Jogador {
+  id: string;
+  apelido: string;
+}
+
 export function SalaClient({ codigo }: { codigo: string }) {
   const sessionId = useSessaoAnonima();
   const [supabase] = useState(() => criarClienteSupabase());
@@ -39,7 +45,7 @@ export function SalaClient({ codigo }: { codigo: string }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [sala, setSala] = useState<EstadoSala | null>(null);
-  const [jogadores, setJogadores] = useState<string[]>([]);
+  const [jogadores, setJogadores] = useState<Jogador[]>([]);
   const [cartela, setCartela] = useState<ItemCartela[] | null>(null);
   const [marcados, setMarcados] = useState<string[]>([]);
   const [entrando, setEntrando] = useState(false);
@@ -72,11 +78,11 @@ export function SalaClient({ codigo }: { codigo: string }) {
 
     const { data: jogadoresRows } = await supabase
       .from("jogadores")
-      .select("apelido")
+      .select("id, apelido")
       .eq("sala_id", salaRow.id)
       .order("entrou_em");
 
-    setJogadores((jogadoresRows ?? []).map((j) => j.apelido));
+    setJogadores(jogadoresRows ?? []);
 
     const { data: jogadorAtual } = await supabase
       .from("jogadores")
@@ -118,6 +124,17 @@ export function SalaClient({ codigo }: { codigo: string }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     carregar();
   }, [carregar]);
+
+  useRoomChannel(supabase, sala?.id ?? null, {
+    aoEntrarJogador: (novoJogador) => {
+      setJogadores((atual) =>
+        atual.some((j) => j.id === novoJogador.id) ? atual : [...atual, novoJogador]
+      );
+    },
+    aoAtualizarStatus: (status) => {
+      setSala((atual) => (atual ? { ...atual, status } : atual));
+    },
+  });
 
   async function aoEntrar(apelido: string) {
     if (!sessionId) return;
@@ -203,14 +220,18 @@ export function SalaClient({ codigo }: { codigo: string }) {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">
+                <CardTitle className="flex items-center gap-2 text-base">
                   Jogadores ({jogadores.length})
+                  <span
+                    className="size-1.5 rounded-full bg-emerald-500"
+                    title="Atualiza ao vivo"
+                  />
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
-                  {jogadores.map((apelido, i) => (
-                    <li key={i}>{apelido}</li>
+                  {jogadores.map((jogador) => (
+                    <li key={jogador.id}>{jogador.apelido}</li>
                   ))}
                 </ul>
               </CardContent>
@@ -220,10 +241,9 @@ export function SalaClient({ codigo }: { codigo: string }) {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Protótipo — sorteio e sincronização em tempo real entram nos Sprints
-        2 a 4 (veja{" "}
-        <code className="rounded bg-muted px-1 py-0.5">docs/SPRINTS.md</code>).
-        Atualize a página pra ver jogadores novos por enquanto.
+        Protótipo — sorteio entra no Sprint 3 (veja{" "}
+        <code className="rounded bg-muted px-1 py-0.5">docs/SPRINTS.md</code>
+        ). Jogadores entrando aparecem aqui ao vivo, sem precisar de refresh.
       </p>
     </main>
   );

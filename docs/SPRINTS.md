@@ -69,19 +69,23 @@ sozinha — precisa dar refresh na página pra ver quem entrou depois de você.
 
 ---
 
-## Sprint 2 — Tempo real (sala ao vivo)
+## Sprint 2 — Tempo real (sala ao vivo) — concluído
 
 **Objetivo:** todo mundo na sala vê os outros jogadores entrando, ao vivo.
 
-- Canal Supabase Realtime por sala (`sala:{codigo}`)
-- Lista de jogadores atualiza sozinha quando alguém entra (Presence ou
-  Postgres Changes na tabela `jogadores`)
-- Status da sala (aguardando / sorteando / finalizada) refletido em tempo
-  real pra todos
-- Implementar `useRoomChannel` (hoje é um stub em `src/hooks/use-room-channel.ts`)
+- [x] Canal Supabase Realtime por sala (`sala:{codigo_da_sala_id}`), via
+      Postgres Changes — tabelas `jogadores` e `salas` adicionadas à
+      publicação `supabase_realtime` (`supabase/migrations/0004_realtime.sql`)
+- [x] Lista de jogadores atualiza sozinha quando alguém entra (INSERT em
+      `jogadores`, com dedup por id pra não duplicar o próprio jogador)
+- [x] Status da sala (aguardando / sorteando / etc.) refletido em tempo real
+      pra todos (UPDATE em `salas`)
+- [x] `useRoomChannel` implementado de verdade em
+      `src/hooks/use-room-channel.ts`
 
-**Critério de pronto:** abrir a sala em 3 abas mostra a lista de jogadores
-sincronizada nas 3, sem precisar dar refresh.
+**Critério de pronto:** ✅ testado com duas abas (sessões distintas) — a
+aba da Ana mostrou o João entrando e o status da sala mudando pra
+"Sorteio em andamento", sem nenhum reload.
 
 ---
 
