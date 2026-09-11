@@ -89,23 +89,41 @@ aba da Ana mostrou o João entrando e o status da sala mudando pra
 
 ---
 
-## Sprint 3 — Sorteio e marcação
+## Sprint 3 — Sorteio e marcação — concluído
 
 **Objetivo:** o jogo em si — sorteio automático e cada um marcando sua
 cartela.
 
-- Mecanismo de sorteio: sistema sorteia o próximo item do tema (sem repetir)
-  e grava em `sorteios`
-- Broadcast do sorteio pro canal da sala em tempo real
-- Painel "Sorteio" mostra o item atual + histórico dos já sorteados
-- Jogador marca a casa da cartela quando o item sorteado está nela
-  (atualiza `cartelas.marcados`)
-- Decidir e implementar o ritmo do sorteio (ver ponto em aberto em
-  [REGRAS_DO_JOGO.md](./REGRAS_DO_JOGO.md))
+- [x] Mecanismo de sorteio: sistema sorteia o próximo item do tema (sem
+      repetir) e grava em `sorteios` (`sortearProximoItem` em
+      `src/app/salas/actions.ts`)
+- [x] Broadcast do sorteio pro canal da sala em tempo real (evento
+      `aoSortear` em `useRoomChannel`)
+- [x] Painel "Sorteio" mostra o item atual + histórico dos já sorteados
+- [x] Jogador marca a casa da cartela clicando nela — só funciona em itens
+      já sorteados (atualiza `cartelas.marcados` via `marcarItemCartela`)
+- [x] Ritmo do sorteio decidido: **host controla o ritmo** com um botão
+      "Sortear próximo" — ele não escolhe qual item sai (isso é sempre
+      aleatório no servidor), só quando o próximo é revelado. Fica livre
+      pra ler o item em voz alta e dar tempo da turma marcar antes de
+      seguir. Documentado em
+      [REGRAS_DO_JOGO.md](./REGRAS_DO_JOGO.md#pontos-em-aberto-decidirtestar-depois)
 
-**Critério de pronto:** partida jogável do início ao fim manualmente — dá
-pra sortear todos os itens e ver as cartelas se preenchendo em tempo real
-em mais de um dispositivo.
+**Critério de pronto:** ✅ testado com duas sessões — a Ana (host) sorteou
+3 itens pelo botão, o status virou "Sorteio em andamento", o João (não
+host, sem o botão) viu cada sorteio aparecer ao vivo sem reload — inclusive
+o histórico já sorteado ao entrar no meio do jogo — e marcar uma casa
+persistiu corretamente no banco.
+
+**Bug achado e corrigido nesse sprint:** faltava policy de UPDATE em
+`salas`, então a mudança de status pra "sorteando" era bloqueada
+silenciosamente pelo RLS (`0006_update_salas.sql`).
+
+**Limitação conhecida:** o controle de quem pode sortear é só de UI (o
+botão some pra quem não é host) — a policy do banco não impede outra
+sessão de chamar a ação diretamente. Aceitável pro modelo de confiança
+desse MVP (sala de aula, sem contas); revisar se o jogo sair desse
+contexto.
 
 ---
 

@@ -14,6 +14,12 @@ export interface ResultadoAcaoSala {
   codigo?: string;
 }
 
+export interface ResultadoSorteio {
+  ok: boolean;
+  erro?: string;
+  item?: { id: string; rotulo: string };
+}
+
 type ClienteSupabase = Awaited<ReturnType<typeof criarClienteSupabaseServidor>>;
 
 async function buscarItensDoTema(
@@ -201,4 +207,119 @@ export async function entrarNaSala(input: {
   }
 
   return { ok: true, codigo };
+}
+
+/**
+ * Sorteia o próximo item (sem repetir) e grava em `sorteios`. Só o host da
+ * sala pode acionar — quem escolhe QUAL item sai é sempre aleatório aqui no
+ * servidor, o host só controla O RITMO (clica quando quer revelar o
+ * próximo, pra dar tempo de ler em voz alta e a galera marcar).
+ */
+export async function sortearProximoItem(input: {
+  codigo: string;
+  sessionId: string;
+}): Promise<ResultadoSorteio> {
+  const codigo = input.codigo.trim().toUpperCase();
+  if (!input.sessionId) return { ok: false, erro: "Sessão inválida — recarregue a página." };
+
+  const supabase = await criarClienteSupabaseServidor();
+
+  const { data: sala, error: erroSala } = await supabase
+    .from("salas")
+    .select("id, tema_id, status, host_session_id")
+    .eq("codigo", codigo)
+    .maybeSingle();
+
+  if (erroSala || !sala) {
+    return { ok: false, erro: "Sala não encontrada." };
+  }
+
+  if (sala.host_session_id !== input.sessionId) {
+    return { ok: false, erro: "Só quem criou a sala pode sortear." };
+  }
+
+  const itens = await buscarItensDoTema(supabase, sala.tema_id);
+
+  const { data: sorteados, error: erroSorteados } = await supabase
+    .from("sorteios")
+    .select("item_tema_id")
+    .eq("sala_id", sala.id);
+
+  if (erroSorteados) {
+    return { ok: false, erro: "Não deu pra ver o histórico de sorteios. Tenta de novo." };
+  }
+
+  const idsSorteados = new Set((sorteados ?? []).map((s) => s.item_tema_id));
+  const restantes = itens.filter((item) => !idsSorteados.has(item.id));
+
+  if (restantes.length === 0) {
+    return { ok: false, erro: "Todos os itens desse tema já foram sorteados." };
+  }
+
+  const escolhido = restantes[Math.floor(Math.random() * restantes.length)];
+  const proximaOrdem = idsSorteados.size + 1;
+
+  const { error: erroInsert } = await supabase.from("sorteios").insert({
+    sala_id: sala.id,
+    item_tema_id: escolhido.id,
+    ordem: proximaOrdem,
+  });
+
+  if (erroInsert) {
+    return { ok: false, erro: "Não deu pra sortear. Tenta de novo." };
+  }
+
+  if (sala.status === "aguardando") {
+    await supabase.from("salas").update({ status: "sorteando" }).eq("id", sala.id);
+  }
+
+  return { ok: true, item: { id: escolhido.id, rotulo: escolhido.rotulo } };
+}
+
+/** Marca ou desmarca um item na cartela do jogador (só itens já sorteados). */
+export async function marcarItemCartela(input: {
+  cartelaId: string;
+  itemId: string;
+  marcar: boolean;
+}): Promise<ResultadoAcaoSala> {
+  const supabase = await criarClienteSupabaseServidor();
+
+  const { data: cartela, error: erroCartela } = await supabase
+    .from("cartelas")
+    .select("id, sala_id, marcados")
+    .eq("id", input.cartelaId)
+    .single();
+
+  if (erroCartela || !cartela) {
+    return { ok: false, erro: "Cartela não encontrada." };
+  }
+
+  const { data: sorteado } = await supabase
+    .from("sorteios")
+    .select("id")
+    .eq("sala_id", cartela.sala_id)
+    .eq("item_tema_id", input.itemId)
+    .maybeSingle();
+
+  if (!sorteado) {
+    return { ok: false, erro: "Esse item ainda não foi sorteado." };
+  }
+
+  const marcadosAtuais = new Set<string>(cartela.marcados as string[]);
+  if (input.marcar) {
+    marcadosAtuais.add(input.itemId);
+  } else {
+    marcadosAtuais.delete(input.itemId);
+  }
+
+  const { error: erroUpdate } = await supabase
+    .from("cartelas")
+    .update({ marcados: Array.from(marcadosAtuais) })
+    .eq("id", input.cartelaId);
+
+  if (erroUpdate) {
+    return { ok: false, erro: "Não deu pra marcar. Tenta de novo." };
+  }
+
+  return { ok: true };
 }

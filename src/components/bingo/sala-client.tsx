@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { useSessaoAnonima } from "@/hooks/use-sessao-anonima";
 import { useRoomChannel } from "@/hooks/use-room-channel";
 import { criarClienteSupabase } from "@/lib/supabase/client";
-import { entrarNaSala } from "@/app/salas/actions";
+import { entrarNaSala, marcarItemCartela, sortearProximoItem } from "@/app/salas/actions";
 import { Cartela } from "@/components/bingo/cartela";
 import { EntrarNaSalaForm } from "@/components/bingo/entrar-na-sala-form";
 
@@ -31,11 +31,18 @@ interface EstadoSala {
   temaNome: string;
   tamanho: number;
   status: string;
+  hostSessionId: string;
 }
 
 interface Jogador {
   id: string;
   apelido: string;
+}
+
+interface ItemSorteado {
+  id: string;
+  rotulo: string;
+  ordem: number;
 }
 
 export function SalaClient({ codigo }: { codigo: string }) {
@@ -46,9 +53,16 @@ export function SalaClient({ codigo }: { codigo: string }) {
   const [erro, setErro] = useState<string | null>(null);
   const [sala, setSala] = useState<EstadoSala | null>(null);
   const [jogadores, setJogadores] = useState<Jogador[]>([]);
+  const [itensPorId, setItensPorId] = useState<Map<string, string>>(new Map());
+  const [cartelaId, setCartelaId] = useState<string | null>(null);
   const [cartela, setCartela] = useState<ItemCartela[] | null>(null);
   const [marcados, setMarcados] = useState<string[]>([]);
+  const [sorteios, setSorteios] = useState<ItemSorteado[]>([]);
   const [entrando, setEntrando] = useState(false);
+  const [sorteando, setSorteando] = useState(false);
+
+  const isHost = Boolean(sessionId && sala && sessionId === sala.hostSessionId);
+  const sorteadosSet = useMemo(() => new Set(sorteios.map((s) => s.id)), [sorteios]);
 
   const carregar = useCallback(async () => {
     if (!sessionId) return;
@@ -57,7 +71,7 @@ export function SalaClient({ codigo }: { codigo: string }) {
 
     const { data: salaRow, error: erroSala } = await supabase
       .from("salas")
-      .select("id, tamanho_cartela, status, temas(nome)")
+      .select("id, tamanho_cartela, status, host_session_id, tema_id, temas(nome)")
       .eq("codigo", codigoUpper)
       .maybeSingle();
 
@@ -74,7 +88,30 @@ export function SalaClient({ codigo }: { codigo: string }) {
       temaNome: temaRelacionado?.nome ?? "Tema",
       tamanho: salaRow.tamanho_cartela,
       status: salaRow.status,
+      hostSessionId: salaRow.host_session_id,
     });
+
+    const { data: itensRows } = await supabase
+      .from("itens_tema")
+      .select("id, rotulo")
+      .eq("tema_id", salaRow.tema_id);
+
+    const rotuloPorId = new Map((itensRows ?? []).map((i) => [i.id, i.rotulo]));
+    setItensPorId(rotuloPorId);
+
+    const { data: sorteiosRows } = await supabase
+      .from("sorteios")
+      .select("item_tema_id, ordem")
+      .eq("sala_id", salaRow.id)
+      .order("ordem");
+
+    setSorteios(
+      (sorteiosRows ?? []).map((s) => ({
+        id: s.item_tema_id,
+        ordem: s.ordem,
+        rotulo: rotuloPorId.get(s.item_tema_id) ?? "?",
+      }))
+    );
 
     const { data: jogadoresRows } = await supabase
       .from("jogadores")
@@ -94,17 +131,12 @@ export function SalaClient({ codigo }: { codigo: string }) {
     if (jogadorAtual) {
       const { data: cartelaRow } = await supabase
         .from("cartelas")
-        .select("itens, marcados")
+        .select("id, itens, marcados")
         .eq("jogador_id", jogadorAtual.id)
         .single();
 
       if (cartelaRow) {
-        const { data: itensRows } = await supabase
-          .from("itens_tema")
-          .select("id, rotulo")
-          .in("id", cartelaRow.itens);
-
-        const rotuloPorId = new Map((itensRows ?? []).map((i) => [i.id, i.rotulo]));
+        setCartelaId(cartelaRow.id);
         setCartela(
           (cartelaRow.itens as string[]).map((id) => ({
             id,
@@ -134,6 +166,13 @@ export function SalaClient({ codigo }: { codigo: string }) {
     aoAtualizarStatus: (status) => {
       setSala((atual) => (atual ? { ...atual, status } : atual));
     },
+    aoSortear: ({ itemTemaId, ordem }) => {
+      setSorteios((atual) => {
+        if (atual.some((s) => s.id === itemTemaId)) return atual;
+        const rotulo = itensPorId.get(itemTemaId) ?? "?";
+        return [...atual, { id: itemTemaId, ordem, rotulo }].sort((a, b) => a.ordem - b.ordem);
+      });
+    },
   });
 
   async function aoEntrar(apelido: string) {
@@ -149,6 +188,38 @@ export function SalaClient({ codigo }: { codigo: string }) {
 
     setCarregando(true);
     await carregar();
+  }
+
+  async function aoSortear() {
+    if (!sessionId) return;
+    setSorteando(true);
+    const resultado = await sortearProximoItem({ codigo, sessionId });
+    setSorteando(false);
+
+    if (!resultado.ok) {
+      toast.error(resultado.erro ?? "Não deu pra sortear.");
+    }
+    // Em caso de sucesso não precisa atualizar nada aqui — o próprio host
+    // também está assinado no canal e recebe o evento de volta, igual todo
+    // mundo.
+  }
+
+  async function aoClicarItem(itemId: string) {
+    if (!cartelaId) return;
+    const marcarAgora = !marcados.includes(itemId);
+
+    setMarcados((atual) =>
+      marcarAgora ? [...atual, itemId] : atual.filter((id) => id !== itemId)
+    );
+
+    const resultado = await marcarItemCartela({ cartelaId, itemId, marcar: marcarAgora });
+
+    if (!resultado.ok) {
+      toast.error(resultado.erro ?? "Não deu pra marcar.");
+      setMarcados((atual) =>
+        marcarAgora ? atual.filter((id) => id !== itemId) : [...atual, itemId]
+      );
+    }
   }
 
   if (carregando) {
@@ -169,6 +240,10 @@ export function SalaClient({ codigo }: { codigo: string }) {
       </main>
     );
   }
+
+  const totalItens = itensPorId.size;
+  const todosSorteados = totalItens > 0 && sorteios.length >= totalItens;
+  const ultimoSorteio = sorteios[sorteios.length - 1];
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-10">
@@ -202,7 +277,13 @@ export function SalaClient({ codigo }: { codigo: string }) {
               <CardTitle className="text-base">Sua cartela</CardTitle>
             </CardHeader>
             <CardContent>
-              <Cartela itens={cartela} marcados={marcados} tamanho={sala.tamanho} />
+              <Cartela
+                itens={cartela}
+                marcados={marcados}
+                sorteados={sorteadosSet}
+                tamanho={sala.tamanho}
+                aoClicarItem={aoClicarItem}
+              />
             </CardContent>
           </Card>
 
@@ -211,10 +292,42 @@ export function SalaClient({ codigo }: { codigo: string }) {
               <CardHeader>
                 <CardTitle className="text-base">Sorteio</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Nenhum item sorteado ainda.
-                </p>
+              <CardContent className="flex flex-col gap-3">
+                {isHost && (
+                  <Button
+                    size="sm"
+                    onClick={aoSortear}
+                    disabled={sorteando || todosSorteados}
+                  >
+                    {sorteando
+                      ? "Sorteando..."
+                      : todosSorteados
+                        ? "Todos os itens já saíram"
+                        : `Sortear próximo (${sorteios.length}/${totalItens})`}
+                  </Button>
+                )}
+
+                {sorteios.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {isHost
+                      ? "Clique em sortear pra começar."
+                      : "Nenhum item sorteado ainda."}
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm">
+                      <span className="text-muted-foreground">Último: </span>
+                      <strong>{ultimoSorteio.rotulo}</strong>
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {sorteios.map((s) => (
+                        <Badge key={s.id} variant="outline" className="font-normal">
+                          {s.rotulo}
+                        </Badge>
+                      ))}
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 
@@ -241,9 +354,10 @@ export function SalaClient({ codigo }: { codigo: string }) {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Protótipo — sorteio entra no Sprint 3 (veja{" "}
-        <code className="rounded bg-muted px-1 py-0.5">docs/SPRINTS.md</code>
-        ). Jogadores entrando aparecem aqui ao vivo, sem precisar de refresh.
+        Protótipo — detectar bingo de linha/cartela cheia entra no Sprint 4
+        (veja <code className="rounded bg-muted px-1 py-0.5">docs/SPRINTS.md</code>
+        ). Clique numa casa da cartela depois que o item for sorteado pra
+        marcar.
       </p>
     </main>
   );

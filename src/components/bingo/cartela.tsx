@@ -6,11 +6,15 @@ interface ItemCartela {
 export function Cartela({
   itens,
   marcados,
+  sorteados,
   tamanho,
+  aoClicarItem,
 }: {
   itens: ItemCartela[];
   marcados: string[];
+  sorteados: Set<string>;
   tamanho: number;
+  aoClicarItem?: (itemId: string) => void;
 }) {
   const marcadosSet = new Set(marcados);
 
@@ -21,18 +25,25 @@ export function Cartela({
     >
       {itens.map((item) => {
         const marcado = marcadosSet.has(item.id);
+        const jaSorteado = sorteados.has(item.id);
+
         return (
-          <div
+          <button
             key={item.id}
+            type="button"
+            disabled={!jaSorteado}
+            onClick={() => aoClicarItem?.(item.id)}
             className={
-              "flex aspect-square items-center justify-center rounded-md border p-2 text-center text-xs " +
+              "flex aspect-square items-center justify-center rounded-md border p-2 text-center text-xs transition-colors " +
               (marcado
                 ? "border-primary bg-primary text-primary-foreground"
-                : "bg-muted/40 text-muted-foreground")
+                : jaSorteado
+                  ? "border-emerald-500/50 bg-emerald-500/10 text-foreground hover:bg-emerald-500/20"
+                  : "bg-muted/40 text-muted-foreground")
             }
           >
             {item.rotulo}
-          </div>
+          </button>
         );
       })}
     </div>
