@@ -8,8 +8,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CriarSalaForm } from "@/components/bingo/criar-sala-form";
+import { criarClienteSupabaseServidor } from "@/lib/supabase/server";
 
-export default function CriarSalaPage() {
+export default async function CriarSalaPage() {
+  const supabase = await criarClienteSupabaseServidor();
+  const { data: temas } = await supabase
+    .from("temas")
+    .select("slug, nome")
+    .order("nome");
+
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 px-4 py-16">
       <Card className="w-full max-w-md">
@@ -20,7 +27,9 @@ export default function CriarSalaPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <CriarSalaForm />
+          <CriarSalaForm
+            temas={(temas ?? []).map((t) => ({ valor: t.slug, rotulo: t.nome }))}
+          />
         </CardContent>
       </Card>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,16 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-/**
- * Temas de exemplo apenas para visualização do fluxo.
- * A partir do Sprint 1, essa lista vem da tabela `temas` no Supabase.
- */
-const TEMAS_EXEMPLO = [
-  { valor: "banco-de-dados", rotulo: "Banco de Dados" },
-  { valor: "normalizacao", rotulo: "Banca de Normalização" },
-  { valor: "redes", rotulo: "Redes de Computadores" },
-];
+import { useSessaoAnonima } from "@/hooks/use-sessao-anonima";
+import { criarSala } from "@/app/salas/actions";
 
 const TAMANHOS = [
   { valor: "3", rotulo: "3x3 (9 casas)" },
@@ -29,19 +22,49 @@ const TAMANHOS = [
   { valor: "5", rotulo: "5x5 (25 casas)" },
 ];
 
-export function CriarSalaForm() {
+interface OpcaoTema {
+  valor: string;
+  rotulo: string;
+}
+
+export function CriarSalaForm({ temas }: { temas: OpcaoTema[] }) {
+  const router = useRouter();
+  const sessionId = useSessaoAnonima();
   const [enviando, setEnviando] = useState(false);
 
-  function aoEnviar(evento: React.FormEvent) {
+  async function aoEnviar(evento: React.FormEvent<HTMLFormElement>) {
     evento.preventDefault();
+
+    if (!sessionId) {
+      toast.error("Ainda carregando sua sessão — tenta de novo em 1 segundo.");
+      return;
+    }
+
+    const dados = new FormData(evento.currentTarget);
+    const apelido = String(dados.get("apelido") ?? "");
+    const temaSlug = String(dados.get("tema") ?? "");
+    const tamanho = Number(dados.get("tamanho") ?? 5);
+
     setEnviando(true);
-    // TODO (Sprint 1): criar a sala no Supabase e redirecionar para /sala/[codigo]
-    setTimeout(() => {
-      setEnviando(false);
-      toast.info("Criação de sala ainda não está ligada ao backend.", {
-        description: "Isso entra no Sprint 1 — veja docs/SPRINTS.md.",
-      });
-    }, 400);
+    const resultado = await criarSala({ apelido, temaSlug, tamanho, sessionId });
+    setEnviando(false);
+
+    if (!resultado.ok || !resultado.codigo) {
+      toast.error(resultado.erro ?? "Não deu pra criar a sala.");
+      return;
+    }
+
+    router.push(`/sala/${resultado.codigo}`);
+  }
+
+  if (temas.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Nenhum tema cadastrado ainda. Cadastre um tema em{" "}
+        <code className="rounded bg-muted px-1 py-0.5">supabase/seed.sql</code>{" "}
+        antes de criar uma sala.
+      </p>
+    );
   }
 
   return (
@@ -55,14 +78,14 @@ export function CriarSalaForm() {
         <Label htmlFor="tema">Tema</Label>
         <Select
           name="tema"
-          items={TEMAS_EXEMPLO.map((t) => ({ value: t.valor, label: t.rotulo }))}
-          defaultValue={TEMAS_EXEMPLO[0].valor}
+          items={temas.map((t) => ({ value: t.valor, label: t.rotulo }))}
+          defaultValue={temas[0].valor}
         >
           <SelectTrigger id="tema" className="w-full">
             <SelectValue placeholder="Escolha um tema" />
           </SelectTrigger>
           <SelectContent>
-            {TEMAS_EXEMPLO.map((tema) => (
+            {temas.map((tema) => (
               <SelectItem key={tema.valor} value={tema.valor}>
                 {tema.rotulo}
               </SelectItem>

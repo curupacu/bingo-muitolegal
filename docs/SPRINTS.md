@@ -40,22 +40,32 @@ telas, nada quebra.
 
 ---
 
-## Sprint 1 — Salas de verdade (persistência)
+## Sprint 1 — Salas de verdade (persistência) — concluído
 
 **Objetivo:** criar e entrar em sala grava e lê do Supabase de verdade.
 
-- Provisionar projeto Supabase (dev) e aplicar a migration
-- Gerar código de sala único (curto, tipo `BD7X2K`)
-- Sessão anônima: gerar e guardar um `session_id` do jogador (cookie)
-- Tela "Criar sala": grava tema + tamanho + host no banco, redireciona pra
-  `/sala/[codigo]`
-- Tela "Entrar em sala": valida código, cria registro em `jogadores`, gera a
-  cartela do jogador (`gerarCartela`) e grava em `cartelas`
-- Tratar erros: código inválido, sala já em andamento, tema sem itens
-  suficientes pro tamanho de cartela escolhido
+- [x] Projeto Supabase de dev provisionado (`bingo-muitolegal`, org
+      `curupacu's Org`), migrations + seed aplicados
+- [x] Código de sala único gerado (6 caracteres, sem 0/O/1/I/L ambíguos) —
+      `src/lib/game/gerar-codigo-sala.ts`
+- [x] Sessão anônima: `session_id` gerado e guardado em `localStorage` (ver
+      `src/hooks/use-sessao-anonima.ts` — decidimos localStorage em vez de
+      cookie httpOnly pra evitar a complexidade de middleware nesse MVP)
+- [x] Tela "Criar sala" grava tema + tamanho + host no banco e redireciona
+      pra `/sala/[codigo]` (`src/app/salas/actions.ts` → `criarSala`)
+- [x] `/sala/[codigo]` funciona como portão de entrada: se a sessão ainda
+      não tem jogador ali, mostra formulário de apelido; ao entrar, cria
+      `jogadores` + `cartelas` (`entrarNaSala`) e mostra a cartela real
+- [x] Erros tratados: código inválido/sala não encontrada, tema sem itens
+      suficientes pro tamanho de cartela (com limpeza da sala órfã se falhar
+      depois de já ter sido criada)
 
-**Critério de pronto:** duas pessoas em abas diferentes conseguem criar e
-entrar na mesma sala, cada uma com sua própria cartela salva no banco.
+**Critério de pronto:** ✅ testado manualmente — duas sessões diferentes
+criam/entram na mesma sala (`U4DUX8`), cada uma com cartela própria e
+distinta, lista de jogadores e sala persistidas no Supabase.
+
+**Ainda não faz** (fica pro Sprint 2): a lista de jogadores não atualiza
+sozinha — precisa dar refresh na página pra ver quem entrou depois de você.
 
 ---
 
