@@ -1,5 +1,7 @@
 # Bingo Temático
 
+🔗 **[bingo-muitolegal.vercel.app](https://bingo-muitolegal.vercel.app)**
+
 Bingo multiplayer em tempo real: o host cria uma sala escolhendo um tema
 (ex: "Banco de Dados"), cada jogador entra com um apelido e recebe uma
 cartela com itens do tema sorteados em posições aleatórias. O sistema vai
@@ -25,9 +27,6 @@ npm run dev
 ```
 
 Abra [http://localhost:3000](http://localhost:3000).
-
-> Enquanto o Sprint 1 não estiver pronto, as telas de criar/entrar em sala
-> são um protótipo visual — não gravam nada no banco ainda.
 
 ### Banco de dados (Supabase)
 
@@ -69,8 +68,8 @@ docs/
 
 ## Deploy
 
-Alvo é a Vercel, com um projeto Supabase de produção. Variáveis de
-ambiente necessárias estão listadas em `.env.example` — configure as
-mesmas no painel da Vercel (Project Settings → Environment Variables)
-antes do deploy. Detalhes do processo em
-[docs/SPRINTS.md](./docs/SPRINTS.md#sprint-5--polimento-e-deploy).
+No ar em [bingo-muitolegal.vercel.app](https://bingo-muitolegal.vercel.app),
+conectado ao repositório — todo `git push` pra `main` publica uma nova
+versão automaticamente. Variáveis de ambiente configuradas em
+*Project Settings → Environment Variables* na Vercel (mesmas do
+`.env.example`).
