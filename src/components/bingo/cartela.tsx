@@ -18,6 +18,11 @@ export function Cartela({
 }) {
   const marcadosSet = new Set(marcados);
 
+  // No celular, 5 colunas deixam a casa com ~60px — a fonte precisa encolher
+  // pra palavra longa ("Cardinalidade") caber sem quebrar no meio.
+  const tamanhoTexto =
+    tamanho >= 5 ? "text-[10px]" : tamanho === 4 ? "text-[11px]" : "text-xs";
+
   return (
     <div
       className="grid gap-1.5 sm:gap-2"
@@ -34,15 +39,17 @@ export function Cartela({
             disabled={!jaSorteado}
             onClick={() => aoClicarItem?.(item.id)}
             className={
-              "flex min-h-14 items-center justify-center rounded-lg border p-1 text-center text-[11px] leading-tight break-words hyphens-auto transition-colors sm:aspect-square sm:min-h-0 sm:p-2 sm:text-xs " +
+              `flex min-h-15 items-center justify-center overflow-hidden rounded-xl border-2 px-1 py-1.5 text-center leading-tight font-medium transition-[transform,box-shadow,background-color] duration-100 sm:aspect-square sm:min-h-0 sm:p-2 sm:text-xs ${tamanhoTexto} ` +
               (marcado
-                ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                ? "-rotate-1 border-primary bg-primary text-primary-foreground shadow-[0_3px_0_0_var(--primary-escuro)]"
                 : jaSorteado
-                  ? "border-amber-400/60 bg-amber-400/15 text-foreground hover:bg-amber-400/25"
-                  : "bg-muted/40 text-muted-foreground")
+                  ? "border-bola-borda bg-bola/25 text-foreground shadow-[0_3px_0_0_var(--bola-borda)] hover:bg-bola/40 active:translate-y-[2px] active:shadow-[0_1px_0_0_var(--bola-borda)]"
+                  : "border-border bg-muted/50 text-muted-foreground")
             }
           >
-            {item.rotulo}
+            <span className="w-full break-words hyphens-auto">
+              {item.rotulo}
+            </span>
           </button>
         );
       })}

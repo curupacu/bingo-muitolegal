@@ -13,6 +13,7 @@ import { criarClienteSupabase } from "@/lib/supabase/client";
 import { entrarNaSala, marcarItemCartela, sortearProximoItem } from "@/app/salas/actions";
 import { Cartela } from "@/components/bingo/cartela";
 import { EntrarNaSalaForm } from "@/components/bingo/entrar-na-sala-form";
+import { Marca } from "@/components/bingo/marca";
 
 const STATUS_ROTULO: Record<string, string> = {
   aguardando: "Aguardando jogadores",
@@ -231,7 +232,18 @@ export function SalaClient({ codigo }: { codigo: string }) {
       toast.success(
         tipoNormalizado === "cartela_cheia"
           ? `🏆 ${apelido} fez BINGO com a cartela cheia!`
-          : `🎉 ${apelido} fechou uma linha!`
+          : `🎉 ${apelido} fechou uma linha!`,
+        {
+          style: {
+            background:
+              tipoNormalizado === "cartela_cheia"
+                ? "var(--primary)"
+                : "var(--coral)",
+            color: "#fff",
+            border: "none",
+            fontWeight: 600,
+          },
+        }
       );
       setVitorias((atual) => [...atual, { jogadorId, tipo: tipoNormalizado }]);
     },
@@ -328,22 +340,28 @@ export function SalaClient({ codigo }: { codigo: string }) {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-10">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Sala &middot; {sala.temaNome}
-          </p>
-          <h1 className="text-2xl font-bold tracking-tight uppercase">{codigo}</h1>
-          {sala.fechaEm && !jaEncerrouPorData && (
-            <p className="text-xs text-muted-foreground">
-              Aberta até {formatarData(sala.fechaEm)}
-            </p>
-          )}
+    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-3 py-8 sm:px-4 sm:py-10">
+      <header className="flex flex-col gap-4">
+        <Marca comoLink />
+
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+              {sala.temaNome}
+            </span>
+            <h1 className="inline-flex w-fit rounded-xl bg-primary px-3.5 py-1.5 font-display text-2xl font-extrabold tracking-[0.14em] text-primary-foreground uppercase shadow-[0_4px_0_0_var(--primary-escuro)]">
+              {codigo}
+            </h1>
+            {sala.fechaEm && !jaEncerrouPorData && (
+              <p className="text-xs text-muted-foreground">
+                Aberta até {formatarData(sala.fechaEm)}
+              </p>
+            )}
+          </div>
+          <Badge variant="secondary">
+            {STATUS_ROTULO[sala.status] ?? sala.status}
+          </Badge>
         </div>
-        <Badge variant="secondary">
-          {STATUS_ROTULO[sala.status] ?? sala.status}
-        </Badge>
       </header>
 
       <Separator />
@@ -360,7 +378,7 @@ export function SalaClient({ codigo }: { codigo: string }) {
       {!cartela ? (
         <Card className="mx-auto w-full max-w-sm">
           <CardHeader>
-            <CardTitle className="text-base">Entrar nessa sala</CardTitle>
+            <CardTitle className="font-display text-lg">Entrar nessa sala</CardTitle>
           </CardHeader>
           <CardContent>
             <EntrarNaSalaForm aoEntrar={aoEntrar} enviando={entrando} />
@@ -370,9 +388,9 @@ export function SalaClient({ codigo }: { codigo: string }) {
         <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Sua cartela</CardTitle>
+              <CardTitle className="font-display text-lg">Sua cartela</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-2 sm:px-(--card-spacing)">
               <Cartela
                 itens={cartela}
                 marcados={marcados}
@@ -387,7 +405,7 @@ export function SalaClient({ codigo }: { codigo: string }) {
             {sala.modo === "observacao" ? (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Como jogar</CardTitle>
+                  <CardTitle className="font-display text-lg">Como jogar</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
@@ -400,7 +418,7 @@ export function SalaClient({ codigo }: { codigo: string }) {
             ) : (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Sorteio</CardTitle>
+                  <CardTitle className="font-display text-lg">Sorteio</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
                   {isHost && (
@@ -450,9 +468,9 @@ export function SalaClient({ codigo }: { codigo: string }) {
             )}
 
             {vitorias.length > 0 && (
-              <Card>
+              <Card className="border-2 border-coral/40 bg-coral/5">
                 <CardHeader>
-                  <CardTitle className="text-base">Vencedores</CardTitle>
+                  <CardTitle className="font-display text-lg">Vencedores</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3 text-sm">
                   {vencedoresLinha.length > 0 && (
@@ -481,10 +499,10 @@ export function SalaClient({ codigo }: { codigo: string }) {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2 font-display text-lg">
                   Jogadores ({jogadores.length})
                   <span
-                    className="size-1.5 rounded-full bg-emerald-500"
+                    className="size-2 rounded-full bg-verde"
                     title="Atualiza ao vivo"
                   />
                 </CardTitle>
@@ -502,9 +520,6 @@ export function SalaClient({ codigo }: { codigo: string }) {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Protótipo — visual ainda simples, o layout final vem depois (veja{" "}
-        <code className="rounded bg-muted px-1 py-0.5">docs/SPRINTS.md</code>
-        ).{" "}
         {sala.modo === "observacao"
           ? "Clique na cartela pra marcar o que você for presenciando."
           : "Clique numa casa da cartela depois que o item for sorteado pra marcar."}
