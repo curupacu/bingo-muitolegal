@@ -32,6 +32,12 @@ export function Cartela({
         const marcado = marcadosSet.has(item.id);
         const jaSorteado = sorteados.has(item.id);
 
+        // Rótulo curto (ex: número do bingo tradicional) aparece grande.
+        const textoCasa =
+          item.rotulo.length <= 3
+            ? "font-display text-xl font-extrabold sm:text-3xl"
+            : `font-medium sm:text-xs ${tamanhoTexto}`;
+
         return (
           <button
             key={item.id}
@@ -39,7 +45,7 @@ export function Cartela({
             disabled={!jaSorteado}
             onClick={() => aoClicarItem?.(item.id)}
             className={
-              `flex min-h-15 items-center justify-center overflow-hidden rounded-xl border-2 px-1 py-1.5 text-center leading-tight font-medium transition-[transform,box-shadow,background-color] duration-100 sm:aspect-square sm:min-h-0 sm:p-2 sm:text-xs ${tamanhoTexto} ` +
+              `flex min-h-15 items-center justify-center overflow-hidden rounded-xl border-2 px-1 py-1.5 text-center leading-tight transition-[transform,box-shadow,background-color] duration-100 sm:aspect-square sm:min-h-0 sm:p-2 ${textoCasa} ` +
               (marcado
                 ? "-rotate-1 border-primary bg-primary text-primary-foreground shadow-[0_3px_0_0_var(--primary-escuro)]"
                 : jaSorteado
